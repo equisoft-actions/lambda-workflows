@@ -1,0 +1,73 @@
+name: Build and Deploy Lambda Function
+
+on:
+  workflow_call:
+    inputs:
+      name:
+        description: 'Lambda function name'
+        required: true
+        type: string
+      create_package:
+        description: 'Whether to create a zip package. If false, specify existing zip in package_source'
+        required: false
+        type: boolean
+        default: true
+      package_source:
+        description: 'The source of the zip package.'
+        required: false
+        type: string
+        default: 'src'
+      s3_bucket_name:
+        description: 'The name of the S3 bucket to upload the zip package to.'
+        required: true
+        type: string
+      aws_region:
+        description: 'The AWS region of the S3 bucket and lambda function.'
+        required: true
+        type: string
+      aws_account_id:
+        description: 'The AWS account ID of the S3 bucket and lambda function.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: 'Setup'
+        id: 'setup'
+        run: |
+          # if create_package is false, use package_source as package name
+          if [[ "${{ inputs.create_package }}" == "false" ]]; then
+            echo "package_name=${{ inputs.package_source }}" >> $GITHUB_OUTPUT
+          else
+            echo "package_name=${{ inputs.name }}.zip" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 'Create Zip File'
+        if: ${{ inputs.create_package == 'true' }}
+        run: |
+          zip -r ${{ steps.setup.outputs.package_name }} ${{ inputs.package_source }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ inputs.aws_account_id }}:role/github-action-${{ inputs.name }}
+          role-session-name: ${{ inputs.name }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: 'Upload to S3 Bucket'
+        run: |
+          aws s3 cp ${{ steps.setup.outputs.package_name }} s3://${{ inputs.s3_bucket_name }}/${{ inputs.name }}/
+
+      - name: 'Update lambda code'
+        run: |
+          aws lambda update-function-code --function-name ${{ inputs.name }} --s3-bucket ${{ inputs.s3_bucket_name }} --s3-key ${{ inputs.name }}/${{ steps.setup.outputs.package_name }}
