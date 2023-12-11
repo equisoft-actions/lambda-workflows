@@ -53,7 +53,7 @@ jobs:
           fi
 
       - name: 'Create Zip File'
-        if: ${{ inputs.create_package == 'true' }}
+        if: ${{ inputs.create_package == true }}
         run: |
           zip -r ${{ steps.setup.outputs.package_name }} ${{ inputs.package_source }}
 
