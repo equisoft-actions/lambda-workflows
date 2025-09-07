@@ -58,7 +58,7 @@ jobs:
           zip -r ${{ steps.setup.outputs.package_name }} ${{ inputs.package_source }}
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: arn:aws:iam::${{ inputs.aws_account_id }}:role/github-action-${{ inputs.name }}
           role-session-name: ${{ inputs.name }}
